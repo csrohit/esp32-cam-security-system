@@ -1,13 +1,4 @@
 #include <Arduino.h>
-/*
-  Rui Santos
-  Complete project details at https://RandomNerdTutorials.com/esp32-cam-shield-pcb-telegram/
-
-  Project created using Brian Lough's Universal Telegram Bot Library: https://github.com/witnessmenow/Universal-Arduino-Telegram-Bot
-
-  The above copyright notice and this permission notice shall be included in all
-  copies or substantial portions of the Software.
-*/
 
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -17,8 +8,8 @@
 #include <UniversalTelegramBot.h>
 
 // Replace with your network credentials
-const char *ssid = "nimkar";
-// const char *ssid = "OnePlus";
+// const char *ssid = "nimkar";
+const char *ssid = "OnePlus";
 const char *password = "Flanker-H";
 // Use @myidbot to find out the chat ID of an individual or a group
 // Also note that you need to click "start" on a bot before it can
@@ -54,6 +45,8 @@ UniversalTelegramBot bot(BOTtoken, clientTCP);
 #define PCLK_GPIO_NUM 22
 
 #define FLASH_LED_PIN 4
+#define DOOR 14
+#define STATUS 12
 bool flashState = LOW;
 
 // Motion Sensor
@@ -74,11 +67,15 @@ static void IRAM_ATTR detectsMovement(void *arg)
 
 void setup()
 {
+
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
   Serial.begin(115200);
 
+  pinMode(DOOR, OUTPUT);
+  pinMode(STATUS, INPUT_PULLUP);
   pinMode(FLASH_LED_PIN, OUTPUT);
   digitalWrite(FLASH_LED_PIN, flashState);
+  digitalWrite(DOOR, LOW);
 
   WiFi.mode(WIFI_STA);
   Serial.println();
@@ -156,6 +153,7 @@ void setup()
   {
     Serial.printf("set intr type failed with error 0x%x \r\n", err);
   }
+  bot.sendMessage(chatId, "Security system is online..");
 }
 
 void loop()
@@ -314,13 +312,42 @@ void handleNewMessages(int numNewMessages)
       sendPhoto = true;
       Serial.println("New photo  request");
     }
+    if (text == "/open")
+    {
+      digitalWrite(DOOR, HIGH);
+      bot.sendMessage(chat_id, "Door is Open");
+      Serial.println("Door is open");
+    }
+    if (text == "/close")
+    {
+      digitalWrite(DOOR, LOW);
+      bot.sendMessage(chat_id, "Door is closed", "");
+      Serial.println("Door is closed");
+    }
+    if (text == "/door")
+    {
+      uint8_t a = digitalRead(STATUS);
+      Serial.println(a);
+      if (a)
+      {
+        bot.sendMessage(chat_id, "Door is Open");
+        Serial.println("Door is open");
+      }
+      else
+      {
+        bot.sendMessage(chat_id, "Door is closed", "");
+        Serial.println("Door is closed");
+      }
+    }
 
     if (text == "/start")
     {
       String welcome = "Welcome to the ESP32-CAM Telegram bot.\n";
       welcome += "/photo : takes a new photo\n";
       welcome += "/flash : toggle flash LED\n";
-      welcome += "/readings : request sensor readings\n\n";
+      welcome += "/open : Open door\n";
+      welcome += "/close : Close door\n";
+      welcome += "/door : Door status\n\n";
       welcome += "You'll receive a photo whenever motion is detected.\n";
       bot.sendMessage(chatId, welcome, "Markdown");
     }
